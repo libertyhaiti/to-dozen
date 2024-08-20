@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Enhanced To-Do List with Minimalist Pomodoro Timer and Daily Journal</title>
+    <meta name="description" content="An enhanced to-do list application with a minimalist Pomodoro timer and daily journal to keep you motivated and focused.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #timer {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex">
+    <!-- Side Menu -->
+    <nav class="bg-gray-800 w-64 p-6">
+        <h1 class="text-2xl font-bold mb-6">TodoZen</h1>
+        <ul>
+            <li class="mb-4"><a href="#" class="text-white hover:text-gray-300" onclick="showPage('today')">Today</a></li>
+            <li class="mb-4"><a href="#" class="text-white hover:text-gray-300" onclick="showPage('tomorrow')">Tomorrow</a></li>
+            <li class="mb-4"><a href="#" class="text-white hover:text-gray-300" onclick="showPage('completed')">Completed</a></li>
+            <li class="mb-4"><a href="#" class="text-white hover:text-gray-300" onclick="showPage('pomodoro')">Pomodoro</a></li>
+            <li class="mb-4"><a href="#" class="text-white hover:text-gray-300" onclick="showPage('journal')">Daily Journal</a></li>
+        </ul>
+    </nav>
+    <!-- Main Content -->
+    <div class="flex-1 p-10">
+        <div id="dateDisplay" class="text-2xl font-bold mb-6"></div>
+        <div id="taskInput" class="mb-6">
+            <input type="text" id="task" placeholder="Add a new task" class="w-full p-2 border rounded bg-gray-700 text-white mb-2">
+            <div class="flex">
+                <input type="text" id="dueDate" placeholder="Select due date" class="p-2 border rounded mr-2 bg-gray-700 text-white flex-grow">
+                <button onclick="addTask()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add Task</button>
+            </div>
+        </div>
+        <div id="today" class="page">
+            <h2 class="text-2xl font-semibold mb-4">Today's Tasks</h2>
+            <ul id="todayTasks" class="space-y-2"></ul>
+        </div>
+        <div id="tomorrow" class="page hidden">
+            <h2 class="text-2xl font-semibold mb-4">Tomorrow's Tasks</h2>
+            <ul id="tomorrowTasks" class="space-y-2"></ul>
+        </div>
+        <div id="completed" class="page hidden">
+            <h2 class="text-2xl font-semibold mb-4">Completed Tasks</h2>
+            <ul id="completedTasks" class="space-y-2"></ul>
+        </div>
+        <div id="pomodoro" class="page hidden">
+            <div id="bg-wrapper" class="fixed top-0 left-0 w-full h-full z-[-1]">
+                <img id="bg-image" src="https://flocus.com/minimalist-pomodoro-timer/07a5f4057cb0f03d2024.jpg" width="100%" height="100%" class="object-cover"/>
+            </div>
+            <div class="text-center">
+                <div id="timer" class="text-8xl font-bold mb-8">25:00</div>
+                <button id="startStop" onclick="toggleTimer()" class="bg-white text-black px-8 py-3 rounded-full text-xl font-semibold hover:bg-gray-200 mr-4">Start</button>
+                <button onclick="resetTimer()" class="bg-red-500 text-white px-8 py-3 rounded-full text-xl font-semibold hover:bg-red-600">Reset</button>
+            </div>
+            <div id="spotify-wrapper" class="fixed bottom-0 left-0 w-full">
+                <iframe id="spotify" src="https://open.spotify.com/embed/playlist/4Zjli1P13J5mmSCD5iKAXK?theme=0" width="100%" height="80" frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
+            </div>
+        </div>
+        <div id="journal" class="page hidden">
+            <h2 class="text-2xl font-semibold mb-4">Daily Journal</h2>
+            <div id="journalEntry" class="mb-6">
+                <textarea id="journalText" placeholder="Write your daily entry here..." class="w-full p-2 border rounded bg-gray-700 text-white mb-2" rows="10"></textarea>
+                <button onclick="saveJournalEntry()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Save Entry</button>
+            </div>
+            <div id="pastEntries"></div>
+        </div>
+    </div>
+    <script>
+    flatpickr("#dueDate", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+    });
+    function updateDateDisplay() {
+        const dateDisplay = document.getElementById('dateDisplay');
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateDisplay.textContent = new Date().toLocaleDateString('en-US', options);
+    }
+    function showPage(pageId) {
+        document.querySelectorAll('.page').forEach(page => page.classList.add('hidden'));
+        document.getElementById(pageId).classList.remove('hidden');
+        if (pageId === 'pomodoro' || pageId === 'journal') {
+            document.getElementById('taskInput').classList.add('hidden');
+        } else {
+            document.getElementById('taskInput').classList.remove('hidden');
+        }
+        if (pageId === 'journal') {
+            displayJournalEntries();
+        }
+    }
+    function addTask() {
+        const taskInput = document.getElementById('task');
+        const dueDate = document.getElementById('dueDate');
+        if (taskInput.value.trim() !== '' && dueDate.value !== '') {
+            const task = {
+                text: taskInput.value,
+                dueDate: new Date(dueDate.value),
+                completed: false
+            };
+            categorizeAndAddTask(task);
+            taskInput.value = '';
+            dueDate.value = '';
+        }
+    }
+    function categorizeAndAddTask(task) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        let category;
+        if (task.completed) {
+            category = 'completedTasks';
+        } else if (task.dueDate < tomorrow) {
+            category = 'todayTasks';
+        } else if (task.dueDate < new Date(tomorrow.getTime() + 24*60*60*1000)) {
+            category = 'tomorrowTasks';
+        } else {
+            category = 'todayTasks'; // Default to today if it's beyond tomorrow
+        }
+        const taskList = document.getElementById(category);
+        const li = createTaskElement(task);
+        taskList.appendChild(li);
+    }
+    function createTaskElement(task) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between p-2 bg-gray-700 rounded';
+        li.innerHTML = `
+            <div class="flex items-center">
+                <div class="w-6 h-6 mr-2 rounded-full border-2 border-white flex items-center justify-center cursor-pointer ${task.completed ? 'bg-green-500' : ''}" onclick="toggleTaskCompletion(this)">
+                    ${task.completed ? '✓' : ''}
+                </div>
+                <span>${task.text}</span>
+            </div>
+            <div>
+                <span class="text-sm text-gray-300 mr-2">Due: ${task.dueDate.toLocaleString()}</span>
+                <button onclick="editTask(this)" class="text-yellow-500 hover:text-yellow-700 mr-2">Edit</button>
+                <button onclick="deleteTask(this)" class="text-red-500 hover:text-red-700">Delete</button>
+            </div>
+        `;
+        return li;
+    }
+    function toggleTaskCompletion(checkbox) {
+        const li = checkbox.closest('li');
+        const task = {
+            text: li.querySelector('span').textContent,
+            dueDate: new Date(li.querySelector('.text-gray-300').textContent.replace('Due: ', '')),
+            completed: !checkbox.classList.contains('bg-green-500')
+        };
+        li.remove();
+        categorizeAndAddTask(task);
+    }
+    function editTask(button) {
+        const li = button.closest('li');
+        const taskSpan = li.querySelector('span');
+        const dueDateSpan = li.querySelector('.text-gray-300');
+        const currentTask = taskSpan.textContent;
+        const currentDueDate = new Date(dueDateSpan.textContent.replace('Due: ', ''));
+        taskSpan.innerHTML = `<input type="text" value="${currentTask}" class="bg-gray-600 text-white p-1 rounded">`;
+        dueDateSpan.innerHTML = `<input type="text" value="${currentDueDate.toLocaleString()}" class="bg-gray-600 text-white p-1 rounded w-40">`;
+        button.textContent = 'Save';
+        button.onclick = function() { saveTask(this); };
+        flatpickr(dueDateSpan.querySelector('input'), {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            defaultDate: currentDueDate
+        });
+    }
+    function saveTask(button) {
+        const li = button.closest('li');
+        const taskInput = li.querySelector('input[type="text"]');
+        const dueDateInput = li.querySelectorAll('input[type="text"]')[1];
+        const checkbox = li.querySelector('.rounded-full');
+        const updatedTask = {
+            text: taskInput.value,
+            dueDate: new Date(dueDateInput.value),
+            completed: checkbox.classList.contains('bg-green-500')
+        };
+        li.remove();
+        categorizeAndAddTask(updatedTask);
+    }
+    function deleteTask(button) {
+        const li = button.closest('li');
+        li.remove();
+    }
+    // Pomodoro Timer
+    let timerInterval;
+    let timeLeft = 25 * 60; // 25 minutes in seconds
+    function updateTimerDisplay() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        document.getElementById('timer').textContent = 
+            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    function toggleTimer() {
+        const startStopButton = document.getElementById('startStop');
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            startStopButton.textContent = 'Start';
+            startStopButton.classList.replace('bg-red-500', 'bg-white');
+            startStopButton.classList.replace('text-white', 'text-black');
+            startStopButton.classList.replace('hover:bg-red-600', 'hover:bg-gray-200');
+        } else {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft === 0) {
+                    clearInterval(timerInterval);
+                    alert('Pomodoro session completed!');
+                    resetTimer();
+                }
+            }, 1000);
+            startStopButton.textContent = 'Stop';
+            startStopButton.classList.replace('bg-white', 'bg-red-500');
+            startStopButton.classList.replace('text-black', 'text-white');
+            startStopButton.classList.replace('hover:bg-gray-200', 'hover:bg-red-600');
+        }
+    }
+    function resetTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        timeLeft = 25 * 60;
+        updateTimerDisplay();
+        const startStopButton = document.getElementById('startStop');
+        startStopButton.textContent = 'Start';
+        startStopButton.classList.replace('bg-red-500', 'bg-white');
+        startStopButton.classList.replace('text-white', 'text-black');
+        startStopButton.classList.replace('hover:bg-red-600', 'hover:bg-gray-200');
+    }
+    // Journal functionality
+    function saveJournalEntry() {
+        const journalText = document.getElementById('journalText').value;
+        if (journalText.trim() !== '') {
+            const date = new Date().toLocaleDateString();
+            const entry = { date, text: journalText };
+            let entries = JSON.parse(localStorage.getItem('journalEntries')) || [];
+            entries.push(entry);
+            localStorage.setItem('journalEntries', JSON.stringify(entries));
+            document.getElementById('journalText').value = '';
+            displayJournalEntries();
+        }
+    }
+    function displayJournalEntries() {
+        const entries = JSON.parse(localStorage.getItem('journalEntries')) || [];
+        const pastEntriesDiv = document.getElementById('pastEntries');
+        pastEntriesDiv.innerHTML = '';
+        entries.reverse().forEach(entry => {
+            const entryDiv = document.createElement('div');
+            entryDiv.className = 'bg-gray-800 p-4 rounded mb-4';
+            entryDiv.innerHTML = `
+                <h3 class="font-bold mb-2">${entry.date}</h3>
+                <p>${entry.text}</p>
+            `;
+            pastEntriesDiv.appendChild(entryDiv);
+        });
+    }
+    // Initialize with Today's tasks visible and update date display
+    showPage('today');
+    updateDateDisplay();
+    setInterval(updateDateDisplay, 60000); // Update date every minute
+    </script>
+</body>
+</html>
